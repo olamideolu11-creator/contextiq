@@ -1,0 +1,35 @@
+Thanks for sharing your HTML — it looks solid! If it’s not opening correctly on GitHub Pages, here are the most common issues and how to fix them:
+
+✅ Quick Fix Checklist
+1. Correct File Placement
+Make sure your files are in the right structure:
+context-iq-woz-mvp/
+├── web/
+│   ├── index.html       ✅ This is your main HTML file
+│   ├── styles.css       ✅ Your stylesheet
+│   ├── app.js           ✅ Your logic
+│   ├── word.js          ✅ Word write-back
+│   ├── ppt.js           ✅ PowerPoint write-back
+│   ├── icon-32.png      ✅ Your logo
+│   └── mock_results/    ✅ Optional folder for JSON
+
+
+2. Enable GitHub Pages
+Go to your repo’s Settings → Pages:
+- Source: main branch
+- Folder: / (root) or /docs (if you moved files there)
+- Save and wait for deployment
+Your site will be live at:
+https://yourusername.github.io/context-iq-woz-mvp/web/index.html
+
+
+3. Case Sensitivity
+context-iq-woz-mvp/
+├── web/
+│   ├── index.html       ✅ This is your main HTML file
+│   ├── styles.css       ✅ Your stylesheet
+│   ├── app.js           ✅ Your logic
+│   ├── word.js          ✅ Word write-back
+│   ├── ppt.js           ✅ PowerPoint write-back
+│   ├── icon-32.png      ✅ Your logo
+│   └── mock_results/    ✅ Optional folder for JSON
