@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Context IQ — Contract Review Assistant (Pilot)</title>
+
+  <!-- Office.js so Word / PowerPoint on the web can talk to this pane -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+  <!-- Main styles for GitHub Pages-hosted pane -->
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="header-card">
+      <div class="logo-lockup">
+        <div class="logo-circle">
+          <span class="logo-initials">IQ</span>
+        </div>
+        <div class="logo-text">
+          <div class="product-name">Context&nbsp;IQ</div>
+          <div class="product-tagline">Context-aware clause review</div>
+        </div>
+        <span class="badge">Wizard-of-Oz Pilot</span>
+      </div>
+    </header>
+
+    <main class="layout-grid">
+      <!-- LEFT COLUMN: Context capture form -->
+      <section class="pane-card">
+        <h2 class="section-title">1. Deal / Context Capture</h2>
+        <form id="ctx-form" class="ctx-form">
+          <label class="field">
+            <span class="field-label">Contract Type</span>
+            <select name="contractType" required class="field-input">
+              <option>NDA</option>
+              <option>MSA</option>
+              <option>SOW</option>
+              <option>Other</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Urgency (close date)</span>
+            <input type="date" name="urgencyDate" required class="field-input"/>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Leverage</span>
+            <select name="leverage" required class="field-input">
+              <option>Ours higher</option>
+              <option>Equal</option>
+              <option>Theirs higher</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Value band</span>
+            <select name="valueBand" required class="field-input">
+              <option>&lt; $50k</option>
+              <option>$50k–$250k</option>
+              <option>$250k–$1M</option>
+              <option>&gt; $1M</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Counterparty</span>
+            <input name="counterparty" placeholder="Acme Ltd" required class="field-input"/>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Risk appetite</span>
+            <select name="risk" required class="field-input">
+              <option>Low</option>
+              <option>Medium</option>
+              <option>High</option>
+            </select>
+          </label>
+
+          <div class="button-row">
+            <button type="submit" class="btn-primary">Analyze</button>
+            <button type="button" id="load-sample" class="btn-secondary">Load sample</button>
+          </div>
+
+          <p class="hint">
+            Pilot flow: you enter context → we generate review JSON manually → pane displays it.
+          </p>
+        </form>
+      </section>
+
+      <!-- RIGHT COLUMN: Results / clause priority list -->
+      <section class="pane-card">
+        <h2 class="section-title">2. Prioritized Clauses</h2>
+        <div id="results" class="results-list"></div>
+      </section>
+    </main>
+
+    <footer class="footer-hint">
+      <div>Prototype for pilot firms — do not upload sensitive client data.</div>
+    </footer>
+
+    <!-- Floating actions for write-back -->
+    <div class="floating-actions">
+      <button id="apply-word" class="btn-fab" title="Apply highlights/edits to Word">
+        Push to Word
+      </button>
+      <button id="apply-ppt" class="btn-fab alt" title="Apply highlights/edits to PowerPoint">
+        Push to PPT
+      </button>
+    </div>
+  </div>
+
+  <!-- App logic -->
+  <script src="app.js"></script>
+  <script src="word.js"></script>
+  <script src="ppt.js"></script>
+</body>
+</html>
