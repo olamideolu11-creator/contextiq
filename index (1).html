@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Context IQ — Wizard-of-Oz MVP</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <img src="icon-32.png" alt="logo"/>
+      <h1>Context IQ</h1>
+      <span class="badge">Wizard‑of‑Oz</span>
+    </div>
+
+    <section class="card">
+      <h2>1) Context Capture</h2>
+      <form id="ctx-form">
+        <div class="grid">
+          <label>Contract Type<select name="contractType" required>
+            <option>NDA</option><option>MSA</option><option>SOW</option><option>Other</option>
+          </select></label>
+          <label>Urgency (close date)<input type="date" name="urgencyDate" required/></label>
+          <label>Leverage<select name="leverage" required>
+            <option>Ours higher</option><option>Equal</option><option>Theirs higher</option>
+          </select></label>
+          <label>Value band<select name="valueBand" required>
+            <option>< $50k</option><option>$50k–$250k</option><option>$250k–$1M</option><option>> $1M</option>
+          </select></label>
+          <label>Counterparty<input name="counterparty" placeholder="Acme Ltd" required/></label>
+          <label>Risk appetite<select name="risk" required>
+            <option>Low</option><option>Medium</option><option>High</option>
+          </select></label>
+        </div>
+        <div class="row">
+          <button type="submit">Analyze</button>
+          <button type="button" id="load-sample">Load sample</button>
+        </div>
+      </form>
+      <p class="hint">WOZ flow: submit context → your team generates a JSON in <code>/web/mock_results/</code> → refresh.</p>
+    </section>
+
+    <section class="card">
+      <h2>2) Prioritized Clauses</h2>
+      <div id="results" class="results"></div>
+    </section>
+
+    <footer>
+      <small>Prototype for pilots — do not upload sensitive data.</small>
+    </footer>
+  </div>
+
+  <div class="floating-actions" style="position:fixed;right:16px;bottom:16px;display:flex;gap:8px;">
+    <button id="apply-word" title="Apply highlights/edits to Word">Apply to Word</button>
+    <button id="apply-ppt"  title="Apply highlights/edits to PowerPoint">Apply to PowerPoint</button>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="word.js"></script>
+  <script src="ppt.js"></script>
+</body>
+</html>
