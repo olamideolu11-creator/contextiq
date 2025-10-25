@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Context IQ Legal Assistant (MVP)</title>
+
+<!-- Office.js: Word Add-in runtime -->
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+<style>
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #0f172a;
+    color: #f8fafc;
+  }
+
+  .card {
+    background: #1e293b;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-size: 1rem;
+    margin: 0 0 8px;
+    color: #fff;
+  }
+
+  label {
+    font-size: .8rem;
+    display: block;
+    margin-bottom: 4px;
+    color: #cbd5e1;
+  }
+
+  select,
+  input {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #475569;
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 8px 10px;
+    font-size: .8rem;
+    margin-bottom: 8px;
+  }
+
+  button {
+    width: 100%;
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: #38bdf8;
+    color: #0f172a;
+  }
+
+  button:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+  }
+
+  .row-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .row-buttons button {
+    flex: 1;
+  }
+
+  .issues {
+    font-size: .8rem;
+  }
+
+  .issue {
+    border-left: 4px solid #f87171;
+    background: #334155;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+  }
+
+  .issue .level {
+    font-weight: 600;
+    font-size: .7rem;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    color: #fff;
+  }
+
+  .small-note {
+    font-size: .7rem;
+    color: #94a3b8;
+    line-height: 1.4;
+  }
+
+  .subtle {
+    font-size: .7rem;
+    color: #475569;
+    margin-top: 4px;
+  }
+
+  .danger {
+    color: #f87171;
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Deal Context / Controls -->
+  <div class="card">
+    <h1>Deal Context</h1>
+
+    <label for="counterparty">Counterparty</label>
+    <input id="counterparty" placeholder="Example: VendorCo Inc." />
+
+    <label for="leverage">Who has leverage?</label>
+    <select id="leverage">
+      <option value="us">We do</option>
+      <option value="them">Counterparty does</option>
+      <option value="balanced" selected>Balanced</option>
+    </select>
+
+    <label for="urgency">Urgency</label>
+    <select id="urgency">
+      <option value="high">Must close ASAP</option>
+      <option value="normal" selected>Normal</option>
+      <option value="low">Flexible timeline</option>
+    </select>
+
+    <label for="dealValue">Deal size (USD)</label>
+    <input id="dealValue" type="number" min="0" placeholder="50000" />
+
+    <label for="riskTolerance">Risk tolerance</label>
+    <select id="riskTolerance">
+      <option value="low" selected>Low (we're conservative)</option>
+      <option value="medium">Medium</option>
+      <option value="high">High (we'll accept more risk)</option>
+    </select>
+
+    <div class="row-buttons">
+      <button id="analyzeBtn" disabled>Analyze Contract</button>
+      <button id="clearBtn" disabled>Clear Highlights</button>
+    </div>
+
+    <div class="row-buttons">
+      <button id="requestDeeperReviewBtn" disabled>Request Deeper Review</button>
+    </div>
+
+    <p class="small-note">
+      "Analyze Contract" highlights risk-heavy clauses (Termination, Liability Cap, Indemnity, etc.) based on
+      your deal context. "Request Deeper Review" will assemble the deal context + contract text into
+      a pre-filled email draft for a deeper human review (Wizard-of-Oz stage).
+    </p>
+
+    <p class="subtle">
+      This is an assistive triage tool. Final legal judgment stays with you.
+    </p>
+  </div>
+
+  <!-- Results -->
+  <div class="card">
+    <h1>Top Issues</h1>
+    <div id="issues" class="issues">
+      <p class="small-note">No analysis yet.</p>
+    </div>
+  </div>
+
+<script>
+/* global Office, Word */
+(() => {
+  let lastIssues = [];
+
+  Office.onReady(info => {
+    if (info.host === Office.HostType.Word) {
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const requestBtn = document.getElementById('requestDeeperReviewBtn');
+
+      analyzeBtn.disabled = false;
+      clearBtn.disabled = false;
+      requestBtn.disabled = false;
+
+      analyzeBtn.addEventListener('click', analyzeContract);
+      clearBtn.addEventListener('click', clearHighlights);
+      requestBtn.addEventListener('click', requestDeeperReview);
+    }
+  });
+
+  function getContextInputs() {
+    return {
+      counterparty: document.getElementById('counterparty').value.trim(),
+      leverage: document.getElementById('leverage').value,
+      urgency: document.getElementById('urgency').value,
+      dealValue: parseFloat(document.getElementById('dealValue').value || "0"),
+      riskTolerance: document.getElementById('riskTolerance').value
+    };
+  }
+
+  function getClauseDefinitions() {
+    return [
+      {
+        key: "termination",
+        name: "Termination / Termination for Convenience",
+        searchTerm: "termination"
+      },
+      {
+        key: "indemnity",
+        name: "Indemnity / Hold Harmless",
+        searchTerm: "indemn"
+      },
+      {
+        key: "liability",
+        name: "Limitation of Liability / Liability Cap",
+        searchTerm: "liabil"
+      },
+      {
+        key: "governinglaw",
+        name: "Governing Law / Jurisdiction",
+        searchTerm: "governing law"
+      }
+    ];
+  }
+
+  function computeRiskLevel(clauseKey, ctx) {
+    let level = "MEDIUM";
+
+    switch (clauseKey) {
+      case "termination":
+        if (ctx.urgency === "high" && ctx.leverage === "them") {
+          level = "HIGH";
+        } else if (ctx.urgency === "low" && ctx.leverage === "us") {
+          level = "LOW";
+        }
+        break;
+
+      case "indemnity":
+        if (ctx.riskTolerance === "low" || ctx.leverage === "them") {
+          level = "HIGH";
+        } else if (ctx.riskTolerance === "high" && ctx.leverage === "us") {
+          level = "LOW";
+        }
+        break;
+
+      case "liability":
+        if (ctx.dealValue >= 1000000 && ctx.riskTolerance === "low") {
+          level = "HIGH";
+        } else if (ctx.dealValue <= 50000 && ctx.riskTolerance === "high") {
+          level = "LOW";
+        }
+        break;
+
+      case "governinglaw":
+        if (ctx.leverage === "them" && ctx.riskTolerance === "low") {
+          level = "MEDIUM";
+        } else {
+          level = "LOW";
+        }
+        break;
+    }
+
+    return level;
+  }
+
+  function colorForRisk(level) {
+    switch (level) {
+      case "HIGH":
+        return "Pink";       // high-risk clauses
+      case "MEDIUM":
+        return "Yellow";     // medium priority
+      case "LOW":
+        return "LightGray";  // low priority / informational
+      default:
+        return "Yellow";
+    }
+  }
+
+  function buildExplanation(def, level, ctx) {
+    const cp = ctx.counterparty || "the counterparty";
+    switch (def.key) {
+      case "termination":
+        if (level === "HIGH") {
+          return `Termination is HIGH because you said the deal is urgent and ${cp} has leverage. If they can exit on short notice, you're exposed operationally.`;
+        } else if (level === "LOW") {
+          return `Termination looks LOW because timing isn't critical and you control leverage. You likely have room to negotiate notice/cure.`;
+        }
+        return `Review termination / termination-for-convenience. Watch for very short notice periods.`;
+
+      case "indemnity":
+        if (level === "HIGH") {
+          return `${cp} may be shifting broad indemnity onto you while you said tolerance is low. Unlimited or vague indemnity = red flag.`;
+        } else if (level === "LOW") {
+          return `Indemnity seems narrower. Still confirm you aren't covering issues controlled by ${cp}.`;
+        }
+        return `Check indemnity / hold harmless. Make sure you are not taking unlimited liability.`;
+
+      case "liability":
+        if (level === "HIGH") {
+          return `Limitation of liability is HIGH because deal value is large and your tolerance is low. Push for a cap (e.g. 1x–2x fees), not unlimited exposure.`;
+        } else if (level === "LOW") {
+          return `Liability cap seems less urgent (smaller deal or you're flexible). Still confirm the cap isn't effectively unlimited.`;
+        }
+        return `Confirm the liability cap and exclusions (indirect, consequential damages).`;
+
+      case "governinglaw":
+        if (level === "LOW") {
+          return `Governing law / venue looks LOW impact for this deal profile. Just confirm it's not an extreme forum for you.`;
+        }
+        return `Jurisdiction favors ${cp}. Litigating there could be expensive if there's a dispute.`;
+
+      default:
+        return `Review this clause in light of urgency (${ctx.urgency}) and leverage (${ctx.leverage}).`;
+    }
+  }
+
+  function renderIssues(issues) {
+    const container = document.getElementById("issues");
+    container.innerHTML = "";
+
+    if (!issues || issues.length === 0) {
+      container.innerHTML = `<p class="small-note">No high-priority red flags based on your inputs. Still review before signing.</p>`;
+      return;
+    }
+
+    const order = { "HIGH": 0, "MEDIUM": 1, "LOW": 2 };
+    issues.sort((a, b) => order[a.level] - order[b.level]);
+
+    issues.forEach(issue => {
+      const div = document.createElement("div");
+      div.className = "issue";
+      div.innerHTML = `
+        <div class="level">${escapeHtml(issue.level)} • ${escapeHtml(issue.clauseName)}</div>
+        <div class="text">${escapeHtml(issue.explanation)}</div>
+      `;
+      container.appendChild(div);
+    });
+
+    const note = document.createElement("p");
+    note.className = "small-note danger";
+    note.textContent = "This is triage, not final legal approval.";
+    container.appendChild(note);
+  }
+
+  function renderMessage(msg) {
+    const container = document.getElementById("issues");
+    container.innerHTML = `<p class="small-note">${escapeHtml(msg)}</p>`;
+  }
+
+  function escapeHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  async function analyzeContract() {
+    const ctxData = getContextInputs();
+    renderMessage("Scanning document...");
+
+    await Word.run(async context => {
+      const body = context.document.body;
+      const clauseDefs = getClauseDefinitions();
+
+      // Search ranges for each clause type
+      const searchWork = clauseDefs.map(def => {
+        const results = body.search(def.searchTerm, {
+          matchCase: false,
+          matchWholeWord: false,
+          matchWildcards: false,
+          matchPrefix: false,
+          matchSuffix: false,
+          ignoreSpace: true,
+          ignorePunct: true
+        });
+        results.load("items");
+        return { def, results };
+      });
+
+      await context.sync();
+
+      let issues = [];
+
+      searchWork.forEach(item => {
+        const hits = item.results.items;
+        if (hits.length === 0) {
+          return;
+        }
+
+        const riskLevel = computeRiskLevel(item.def.key, ctxData);
+        const color = colorForRisk(riskLevel);
+
+        hits.forEach(r => {
+          r.font.highlightColor = color;
+        });
+
+        const explanation = buildExplanation(item.def, riskLevel, ctxData);
+
+        issues.push({
+          clauseName: item.def.name,
+          level: riskLevel,
+          explanation
+        });
+      });
+
+      await context.sync();
+
+      lastIssues = issues;
+      renderIssues(issues);
+    })
+    .catch(function (error) {
+      renderMessage("Error while analyzing: " + error);
+      console.error(error);
+    });
+  }
+
+  async function clearHighlights() {
+    renderMessage("Clearing highlights...");
+
+    await Word.run(async context => {
+      const body = context.document.body;
+      const clauseDefs = getClauseDefinitions();
+
+      const searchWork = clauseDefs.map(def => {
+        const results = body.search(def.searchTerm, {
+          matchCase: false,
+          matchWholeWord: false,
+          matchWildcards: false,
+          matchPrefix: false,
+          matchSuffix: false,
+          ignoreSpace: true,
+          ignorePunct: true
+        });
+        results.load("items");
+        return { def, results };
+      });
+
+      await context.sync();
+
+      searchWork.forEach(item => {
+        item.results.items.forEach(r => {
+          r.font.highlightColor = null;
+        });
+      });
+
+      await context.sync();
+    })
+    .catch(function (error) {
+      renderMessage("Error clearing highlights: " + error);
+      console.error(error);
+    });
+
+    lastIssues = [];
+    renderIssues([]);
+  }
+
+  // Wizard-of-Oz handoff:
+  // Collects context + current doc text and opens a pre-filled email to you.
+  async function requestDeeperReview() {
+    const ctxData = getContextInputs();
+
+    await Word.run(async context => {
+      const body = context.document.body;
+      body.load("text");
+      await context.sync();
+
+      // Grab the first ~2000 chars to keep mailto length workable
+      const contractText = body.text.substring(0, 2000);
+
+      const subject = encodeURIComponent("Context IQ - Deep Review Request");
+      const emailBody = [
+        "Context (from task pane):",
+        JSON.stringify(ctxData, null, 2),
+        "",
+        "Contract excerpt:",
+        contractText
+      ].join("\n\n");
+
+      const mailtoHref =
+        "mailto:SUPPORT_EMAIL@example.com" +
+        "?subject=" + subject +
+        "&body=" + encodeURIComponent(emailBody);
+
+      // This opens user's default mail client with a draft email to you.
+      window.location.href = mailtoHref;
+    })
+    .catch(function (error) {
+      renderMessage("Couldn't prepare deeper review email: " + error);
+      console.error(error);
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
