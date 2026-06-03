@@ -1,507 +1,1045 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0" />
-<title>Context IQ Legal Assistant (MVP)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<!-- Office.js: Word Add-in runtime -->
-<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <title>Context IQ | Context-Aware Contract Review in Microsoft Word</title>
 
-<style>
-  body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    margin: 0;
-    padding: 16px;
-    background: #0f172a;
-    color: #f8fafc;
-  }
+  <meta
+    name="description"
+    content="Context IQ helps legal teams complete first-pass contract review faster by capturing deal context, highlighting priority clauses, and explaining why each clause matters inside Microsoft Word."
+  />
 
-  .card {
-    background: #1e293b;
-    border-radius: 16px;
-    padding: 16px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    margin-bottom: 16px;
-  }
-
-  h1 {
-    font-size: 1rem;
-    margin: 0 0 8px;
-    color: #fff;
-  }
-
-  label {
-    font-size: .8rem;
-    display: block;
-    margin-bottom: 4px;
-    color: #cbd5e1;
-  }
-
-  select,
-  input {
-    width: 100%;
-    border-radius: 8px;
-    border: 1px solid #475569;
-    background: #0f172a;
-    color: #f8fafc;
-    padding: 8px 10px;
-    font-size: .8rem;
-    margin-bottom: 8px;
-  }
-
-  button {
-    width: 100%;
-    border: 0;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: .9rem;
-    font-weight: 600;
-    cursor: pointer;
-    background: #38bdf8;
-    color: #0f172a;
-  }
-
-  button:disabled {
-    opacity: .4;
-    cursor: not-allowed;
-  }
-
-  .row-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 8px;
-  }
-
-  .row-buttons button {
-    flex: 1;
-  }
-
-  .issues {
-    font-size: .8rem;
-  }
-
-  .issue {
-    border-left: 4px solid #f87171;
-    background: #334155;
-    border-radius: 8px;
-    padding: 8px 12px;
-    margin-bottom: 8px;
-  }
-
-  .issue .level {
-    font-weight: 600;
-    font-size: .7rem;
-    text-transform: uppercase;
-    margin-bottom: 4px;
-    color: #fff;
-  }
-
-  .small-note {
-    font-size: .7rem;
-    color: #94a3b8;
-    line-height: 1.4;
-  }
-
-  .subtle {
-    font-size: .7rem;
-    color: #475569;
-    margin-top: 4px;
-  }
-
-  .danger {
-    color: #f87171;
-    font-weight: 500;
-  }
-</style>
-</head>
-<body>
-
-  <!-- Deal Context / Controls -->
-  <div class="card">
-    <h1>Deal Context</h1>
-
-    <label for="counterparty">Counterparty</label>
-    <input id="counterparty" placeholder="Example: VendorCo Inc." />
-
-    <label for="leverage">Who has leverage?</label>
-    <select id="leverage">
-      <option value="us">We do</option>
-      <option value="them">Counterparty does</option>
-      <option value="balanced" selected>Balanced</option>
-    </select>
-
-    <label for="urgency">Urgency</label>
-    <select id="urgency">
-      <option value="high">Must close ASAP</option>
-      <option value="normal" selected>Normal</option>
-      <option value="low">Flexible timeline</option>
-    </select>
-
-    <label for="dealValue">Deal size (USD)</label>
-    <input id="dealValue" type="number" min="0" placeholder="50000" />
-
-    <label for="riskTolerance">Risk tolerance</label>
-    <select id="riskTolerance">
-      <option value="low" selected>Low (we're conservative)</option>
-      <option value="medium">Medium</option>
-      <option value="high">High (we'll accept more risk)</option>
-    </select>
-
-    <div class="row-buttons">
-      <button id="analyzeBtn" disabled>Analyze Contract</button>
-      <button id="clearBtn" disabled>Clear Highlights</button>
-    </div>
-
-    <div class="row-buttons">
-      <button id="requestDeeperReviewBtn" disabled>Request Deeper Review</button>
-    </div>
-
-    <p class="small-note">
-      "Analyze Contract" highlights risk-heavy clauses (Termination, Liability Cap, Indemnity, etc.) based on
-      your deal context. "Request Deeper Review" will assemble the deal context + contract text into
-      a pre-filled email draft for a deeper human review (Wizard-of-Oz stage).
-    </p>
-
-    <p class="subtle">
-      This is an assistive triage tool. Final legal judgment stays with you.
-    </p>
-  </div>
-
-  <!-- Results -->
-  <div class="card">
-    <h1>Top Issues</h1>
-    <div id="issues" class="issues">
-      <p class="small-note">No analysis yet.</p>
-    </div>
-  </div>
-
-<script>
-/* global Office, Word */
-(() => {
-  let lastIssues = [];
-
-  Office.onReady(info => {
-    if (info.host === Office.HostType.Word) {
-      const analyzeBtn = document.getElementById('analyzeBtn');
-      const clearBtn = document.getElementById('clearBtn');
-      const requestBtn = document.getElementById('requestDeeperReviewBtn');
-
-      analyzeBtn.disabled = false;
-      clearBtn.disabled = false;
-      requestBtn.disabled = false;
-
-      analyzeBtn.addEventListener('click', analyzeContract);
-      clearBtn.addEventListener('click', clearHighlights);
-      requestBtn.addEventListener('click', requestDeeperReview);
+  <style>
+    :root {
+      --navy: #0f172a;
+      --navy-soft: #1e293b;
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --sky: #e0f2fe;
+      --gray-50: #f8fafc;
+      --gray-100: #f1f5f9;
+      --gray-200: #e2e8f0;
+      --gray-500: #64748b;
+      --gray-700: #334155;
+      --white: #ffffff;
+      --green: #16a34a;
+      --radius-lg: 22px;
+      --radius-md: 14px;
+      --shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+      --max-width: 1120px;
     }
-  });
 
-  function getContextInputs() {
-    return {
-      counterparty: document.getElementById('counterparty').value.trim(),
-      leverage: document.getElementById('leverage').value,
-      urgency: document.getElementById('urgency').value,
-      dealValue: parseFloat(document.getElementById('dealValue').value || "0"),
-      riskTolerance: document.getElementById('riskTolerance').value
-    };
-  }
+    * {
+      box-sizing: border-box;
+    }
 
-  function getClauseDefinitions() {
-    return [
-      {
-        key: "termination",
-        name: "Termination / Termination for Convenience",
-        searchTerm: "termination"
-      },
-      {
-        key: "indemnity",
-        name: "Indemnity / Hold Harmless",
-        searchTerm: "indemn"
-      },
-      {
-        key: "liability",
-        name: "Limitation of Liability / Liability Cap",
-        searchTerm: "liabil"
-      },
-      {
-        key: "governinglaw",
-        name: "Governing Law / Jurisdiction",
-        searchTerm: "governing law"
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--navy);
+      background: var(--white);
+      line-height: 1.6;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    .container {
+      width: min(100% - 32px, var(--max-width));
+      margin: 0 auto;
+    }
+
+    .section {
+      padding: 88px 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--sky);
+      color: var(--blue-dark);
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 1.12;
+      margin: 0 0 16px;
+      letter-spacing: -0.04em;
+    }
+
+    .section-lead {
+      max-width: 720px;
+      font-size: 1.08rem;
+      color: var(--gray-500);
+      margin: 0 0 36px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 13px 20px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-weight: 800;
+      cursor: pointer;
+      transition: 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--blue);
+      color: var(--white);
+      box-shadow: 0 12px 30px rgba(37, 99, 235, 0.28);
+    }
+
+    .btn-primary:hover {
+      background: var(--blue-dark);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--white);
+      color: var(--navy);
+      border-color: var(--gray-200);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--blue);
+      color: var(--blue);
+      transform: translateY(-1px);
+    }
+
+    /* Header */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .nav {
+      height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      font-size: 1.25rem;
+    }
+
+    .logo-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--blue), #38bdf8);
+      display: grid;
+      place-items: center;
+      color: white;
+      font-weight: 900;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      color: var(--gray-700);
+      font-weight: 700;
+      font-size: 0.94rem;
+    }
+
+    .nav-links a:hover {
+      color: var(--blue);
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      border: 0;
+      background: var(--gray-100);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-weight: 800;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 90px 0 74px;
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.14), transparent 34%),
+        linear-gradient(180deg, var(--gray-50), var(--white));
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 54px;
+      align-items: center;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.6rem, 6vw, 5rem);
+      line-height: 0.98;
+      letter-spacing: -0.07em;
+      margin: 0 0 22px;
+    }
+
+    .hero-text {
+      font-size: 1.15rem;
+      color: var(--gray-500);
+      max-width: 620px;
+      margin-bottom: 30px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .trust-line {
+      color: var(--gray-500);
+      font-size: 0.94rem;
+    }
+
+    .hero-card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .mock-toolbar {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--gray-50);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--gray-200);
+    }
+
+    .mock-body {
+      padding: 22px;
+      display: grid;
+      grid-template-columns: 1fr 0.78fr;
+      gap: 18px;
+    }
+
+    .doc-preview {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 16px;
+      padding: 18px;
+      min-height: 360px;
+    }
+
+    .doc-line {
+      height: 10px;
+      border-radius: 999px;
+      background: var(--gray-200);
+      margin-bottom: 12px;
+    }
+
+    .doc-line.short { width: 72%; }
+    .doc-line.medium { width: 86%; }
+    .doc-line.long { width: 100%; }
+
+    .highlight-red {
+      background: #fecaca;
+      border-radius: 6px;
+      padding: 2px 5px;
+    }
+
+    .highlight-yellow {
+      background: #fef08a;
+      border-radius: 6px;
+      padding: 2px 5px;
+    }
+
+    .pane-preview {
+      background: var(--navy);
+      color: var(--white);
+      border-radius: 16px;
+      padding: 18px;
+    }
+
+    .pane-preview h3 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+
+    .input-pill {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      color: #cbd5e1;
+      font-size: 0.82rem;
+    }
+
+    .risk-card {
+      background: rgba(255, 255, 255, 0.08);
+      border-left: 4px solid #f87171;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 0.82rem;
+      color: #dbeafe;
+    }
+
+    /* Cards */
+    .cards-3,
+    .cards-5 {
+      display: grid;
+      gap: 20px;
+    }
+
+    .cards-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .cards-5 {
+      grid-template-columns: repeat(5, 1fr);
+    }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    }
+
+    .card-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: var(--sky);
+      color: var(--blue-dark);
+      display: grid;
+      place-items: center;
+      font-size: 1.2rem;
+      margin-bottom: 16px;
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--gray-500);
+      font-size: 0.96rem;
+    }
+
+    /* How It Works */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      counter-reset: step;
+    }
+
+    .step {
+      position: relative;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+    }
+
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      margin-bottom: 16px;
+    }
+
+    .step h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    .step p {
+      color: var(--gray-500);
+      margin: 0;
+      font-size: 0.94rem;
+    }
+
+    /* Pilot */
+    .pilot {
+      background: var(--navy);
+      color: var(--white);
+    }
+
+    .pilot .section-lead {
+      color: #cbd5e1;
+    }
+
+    .pilot-grid {
+      display: grid;
+      grid-template-columns: 1fr 0.8fr;
+      gap: 40px;
+      align-items: start;
+    }
+
+    .pilot-list {
+      display: grid;
+      gap: 14px;
+      margin-top: 24px;
+    }
+
+    .pilot-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      color: #e2e8f0;
+    }
+
+    .check {
+      color: #86efac;
+      font-weight: 900;
+    }
+
+    .pilot-form {
+      background: white;
+      color: var(--navy);
+      border-radius: var(--radius-lg);
+      padding: 26px;
+      box-shadow: var(--shadow);
+    }
+
+    .pilot-form h3 {
+      margin: 0 0 8px;
+    }
+
+    .pilot-form p {
+      margin: 0 0 18px;
+      color: var(--gray-500);
+      font-size: 0.94rem;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-weight: 800;
+      font-size: 0.86rem;
+      margin-bottom: 6px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      padding: 12px 13px;
+      border-radius: 12px;
+      border: 1px solid var(--gray-200);
+      font: inherit;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.11);
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    .form-note {
+      font-size: 0.8rem;
+      color: var(--gray-500);
+      margin-top: 12px;
+    }
+
+    /* FAQ */
+    .faq {
+      max-width: 840px;
+    }
+
+    .faq-item {
+      border: 1px solid var(--gray-200);
+      border-radius: 16px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      background: var(--white);
+    }
+
+    .faq-question {
+      width: 100%;
+      padding: 20px;
+      background: var(--white);
+      border: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-weight: 900;
+      text-align: left;
+      color: var(--navy);
+      font-size: 1rem;
+    }
+
+    .faq-answer {
+      display: none;
+      padding: 0 20px 20px;
+      color: var(--gray-500);
+    }
+
+    .faq-item.open .faq-answer {
+      display: block;
+    }
+
+    .faq-icon {
+      font-size: 1.2rem;
+      color: var(--blue);
+    }
+
+    /* Final CTA */
+    .final-cta {
+      text-align: center;
+      background: linear-gradient(135deg, var(--blue), #0f172a);
+      color: white;
+      padding: 84px 0;
+    }
+
+    .final-cta h2 {
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1.05;
+      letter-spacing: -0.05em;
+      margin: 0 0 14px;
+    }
+
+    .final-cta p {
+      color: #dbeafe;
+      max-width: 660px;
+      margin: 0 auto 28px;
+      font-size: 1.08rem;
+    }
+
+    .footer {
+      padding: 30px 0;
+      border-top: 1px solid var(--gray-200);
+      color: var(--gray-500);
+      font-size: 0.9rem;
+    }
+
+    .footer-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    /* Responsive */
+    @media (max-width: 960px) {
+      .hero-grid,
+      .pilot-grid {
+        grid-template-columns: 1fr;
       }
-    ];
-  }
 
-  function computeRiskLevel(clauseKey, ctx) {
-    let level = "MEDIUM";
+      .cards-3,
+      .cards-5,
+      .steps {
+        grid-template-columns: repeat(2, 1fr);
+      }
 
-    switch (clauseKey) {
-      case "termination":
-        if (ctx.urgency === "high" && ctx.leverage === "them") {
-          level = "HIGH";
-        } else if (ctx.urgency === "low" && ctx.leverage === "us") {
-          level = "LOW";
-        }
-        break;
+      .mock-body {
+        grid-template-columns: 1fr;
+      }
 
-      case "indemnity":
-        if (ctx.riskTolerance === "low" || ctx.leverage === "them") {
-          level = "HIGH";
-        } else if (ctx.riskTolerance === "high" && ctx.leverage === "us") {
-          level = "LOW";
-        }
-        break;
+      .nav-links {
+        display: none;
+      }
 
-      case "liability":
-        if (ctx.dealValue >= 1000000 && ctx.riskTolerance === "low") {
-          level = "HIGH";
-        } else if (ctx.dealValue <= 50000 && ctx.riskTolerance === "high") {
-          level = "LOW";
-        }
-        break;
-
-      case "governinglaw":
-        if (ctx.leverage === "them" && ctx.riskTolerance === "low") {
-          level = "MEDIUM";
-        } else {
-          level = "LOW";
-        }
-        break;
+      .mobile-menu-btn {
+        display: inline-flex;
+      }
     }
 
-    return level;
-  }
+    @media (max-width: 620px) {
+      .section {
+        padding: 64px 0;
+      }
 
-  function colorForRisk(level) {
-    switch (level) {
-      case "HIGH":
-        return "Pink";       // high-risk clauses
-      case "MEDIUM":
-        return "Yellow";     // medium priority
-      case "LOW":
-        return "LightGray";  // low priority / informational
-      default:
-        return "Yellow";
+      .hero {
+        padding: 64px 0;
+      }
+
+      .hero h1 {
+        font-size: 2.7rem;
+      }
+
+      .cards-3,
+      .cards-5,
+      .steps {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-actions {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+      }
+
+      .mock-body {
+        padding: 14px;
+      }
+
+      .doc-preview {
+        min-height: 250px;
+      }
     }
-  }
+  </style>
+</head>
 
-  function buildExplanation(def, level, ctx) {
-    const cp = ctx.counterparty || "the counterparty";
-    switch (def.key) {
-      case "termination":
-        if (level === "HIGH") {
-          return `Termination is HIGH because you said the deal is urgent and ${cp} has leverage. If they can exit on short notice, you're exposed operationally.`;
-        } else if (level === "LOW") {
-          return `Termination looks LOW because timing isn't critical and you control leverage. You likely have room to negotiate notice/cure.`;
-        }
-        return `Review termination / termination-for-convenience. Watch for very short notice periods.`;
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container nav">
+      <a href="#" class="logo" aria-label="Context IQ homepage">
+        <span class="logo-mark">IQ</span>
+        <span>Context IQ</span>
+      </a>
 
-      case "indemnity":
-        if (level === "HIGH") {
-          return `${cp} may be shifting broad indemnity onto you while you said tolerance is low. Unlimited or vague indemnity = red flag.`;
-        } else if (level === "LOW") {
-          return `Indemnity seems narrower. Still confirm you aren't covering issues controlled by ${cp}.`;
-        }
-        return `Check indemnity / hold harmless. Make sure you are not taking unlimited liability.`;
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="#problem">Problem</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#pilot">Pilot</a>
+        <a href="#faq">FAQ</a>
+        <a href="#pilot" class="btn btn-primary">Request Pilot</a>
+      </nav>
 
-      case "liability":
-        if (level === "HIGH") {
-          return `Limitation of liability is HIGH because deal value is large and your tolerance is low. Push for a cap (e.g. 1x–2x fees), not unlimited exposure.`;
-        } else if (level === "LOW") {
-          return `Liability cap seems less urgent (smaller deal or you're flexible). Still confirm the cap isn't effectively unlimited.`;
-        }
-        return `Confirm the liability cap and exclusions (indirect, consequential damages).`;
+      <a href="#pilot" class="mobile-menu-btn">Pilot</a>
+    </div>
+  </header>
 
-      case "governinglaw":
-        if (level === "LOW") {
-          return `Governing law / venue looks LOW impact for this deal profile. Just confirm it's not an extreme forum for you.`;
-        }
-        return `Jurisdiction favors ${cp}. Litigating there could be expensive if there's a dispute.`;
+  <!-- Hero -->
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div>
+          <div class="eyebrow">Built for legal teams reviewing contracts in Word</div>
 
-      default:
-        return `Review this clause in light of urgency (${ctx.urgency}) and leverage (${ctx.leverage}).`;
-    }
-  }
+          <h1>Contract review with deal context, inside Microsoft Word.</h1>
 
-  function renderIssues(issues) {
-    const container = document.getElementById("issues");
-    container.innerHTML = "";
+          <p class="hero-text">
+            Context IQ helps lawyers complete first-pass contract review faster by capturing deal context,
+            highlighting priority clauses, and explaining why each clause matters in the negotiation.
+          </p>
 
-    if (!issues || issues.length === 0) {
-      container.innerHTML = `<p class="small-note">No high-priority red flags based on your inputs. Still review before signing.</p>`;
-      return;
-    }
+          <div class="hero-actions">
+            <a href="#pilot" class="btn btn-primary">Request a Pilot</a>
+            <a href="#demo" class="btn btn-secondary">View Demo</a>
+          </div>
 
-    const order = { "HIGH": 0, "MEDIUM": 1, "LOW": 2 };
-    issues.sort((a, b) => order[a.level] - order[b.level]);
+          <p class="trust-line">
+            Assistive review support. Lawyers remain in control of final judgment.
+          </p>
+        </div>
 
-    issues.forEach(issue => {
-      const div = document.createElement("div");
-      div.className = "issue";
-      div.innerHTML = `
-        <div class="level">${escapeHtml(issue.level)} • ${escapeHtml(issue.clauseName)}</div>
-        <div class="text">${escapeHtml(issue.explanation)}</div>
-      `;
-      container.appendChild(div);
+        <div class="hero-card" id="demo" aria-label="Product preview">
+          <div class="mock-toolbar">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+
+          <div class="mock-body">
+            <div class="doc-preview">
+              <div class="doc-line long"></div>
+              <div class="doc-line medium"></div>
+              <div class="doc-line short"></div>
+
+              <p>
+                The agreement may be terminated by either party upon
+                <span class="highlight-red">seven days’ written notice</span>.
+              </p>
+
+              <div class="doc-line long"></div>
+              <div class="doc-line medium"></div>
+
+              <p>
+                Supplier shall indemnify and hold harmless the customer from
+                <span class="highlight-yellow">all losses, claims, and damages</span>.
+              </p>
+
+              <div class="doc-line long"></div>
+              <div class="doc-line short"></div>
+            </div>
+
+            <aside class="pane-preview">
+              <h3>Context IQ</h3>
+              <div class="input-pill">Urgency: High</div>
+              <div class="input-pill">Leverage: Counterparty</div>
+              <div class="input-pill">Risk tolerance: Low</div>
+
+              <div class="risk-card">
+                <strong>HIGH • Termination</strong><br />
+                Flagged because the deal is urgent and the counterparty has leverage.
+                Short notice may create operational risk.
+              </div>
+
+              <div class="risk-card" style="border-left-color:#facc15;">
+                <strong>MEDIUM • Indemnity</strong><br />
+                Review scope and confirm exposure is not broader than intended.
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Problem -->
+    <section class="section" id="problem">
+      <div class="container">
+        <div class="eyebrow">The problem</div>
+        <h2 class="section-title">First-pass contract review is still too manual.</h2>
+        <p class="section-lead">
+          Lawyers review contracts based on context: urgency, leverage, value, risk tolerance,
+          and counterparty relationship. But most workflows still treat every contract the same.
+        </p>
+
+        <div class="cards-3">
+          <article class="card">
+            <div class="card-icon">⏱</div>
+            <h3>Slow review cycles</h3>
+            <p>
+              Legal teams repeatedly scan the same clauses across NDAs, MSAs, vendor agreements,
+              SaaS contracts, and customer contracts.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon">🧩</div>
+            <h3>Missing deal context</h3>
+            <p>
+              Business teams often send contracts without clear urgency, leverage, deal value,
+              or acceptable risk level.
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon">⚠️</div>
+            <h3>Generic AI output</h3>
+            <p>
+              Many tools flag clauses without explaining why they matter in the specific negotiation,
+              creating noise instead of trust.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="section" id="how-it-works" style="background: var(--gray-50);">
+      <div class="container">
+        <div class="eyebrow">How it works</div>
+        <h2 class="section-title">A simple flow built around the lawyer’s workflow.</h2>
+        <p class="section-lead">
+          Context IQ is designed to sit inside Microsoft Word, where first-pass review already happens.
+        </p>
+
+        <div class="steps">
+          <div class="step">
+            <h3>Open Word</h3>
+            <p>Start with the contract already being reviewed in Microsoft Word.</p>
+          </div>
+
+          <div class="step">
+            <h3>Enter context</h3>
+            <p>Add urgency, leverage, deal value, risk tolerance, and counterparty details.</p>
+          </div>
+
+          <div class="step">
+            <h3>Analyze contract</h3>
+            <p>Context IQ identifies key clauses and prioritizes risk for this specific deal.</p>
+          </div>
+
+          <div class="step">
+            <h3>Review insights</h3>
+            <p>See highlighted clauses, plain-language reasoning, and request deeper review if needed.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section" id="features">
+      <div class="container">
+        <div class="eyebrow">Core features</div>
+        <h2 class="section-title">Built for faster first-pass contract review.</h2>
+        <p class="section-lead">
+          The product focuses on the few features that matter most: context, prioritization,
+          explanation, and legal control.
+        </p>
+
+        <div class="cards-5">
+          <article class="card">
+            <div class="card-icon">📌</div>
+            <h3>Deal Context Capture</h3>
+            <p>Capture urgency, leverage, deal value, risk tolerance, and counterparty information.</p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon">🖍</div>
+            <h3>Clause Highlighting</h3>
+            <p>Highlight key clauses such as termination, liability, indemnity, and governing law.</p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon">📊</div>
+            <h3>Risk Prioritization</h3>
+            <p>Rank clauses as High, Medium, or Low priority based on the specific deal context.</p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon">💬</div>
+            <h3>Explainable Insights</h3>
+            <p>Explain why a clause matters and what the lawyer should consider next.</p>
+          </article>
+
+          <article class="card">
+            <div class="card-icon">🧑‍⚖️</div>
+            <h3>Deeper Review</h3>
+            <p>Request a human-validated negotiation brief during the pilot stage.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pilot -->
+    <section class="section pilot" id="pilot">
+      <div class="container pilot-grid">
+        <div>
+          <div class="eyebrow" style="background: rgba(255,255,255,0.12); color: #dbeafe;">Pilot program</div>
+
+          <h2 class="section-title">Join the 3-month Context IQ pilot.</h2>
+
+          <p class="section-lead">
+            Context IQ is being prepared for controlled pilot use with selected legal teams and law firms.
+            The goal is to validate time saved, trust, workflow fit, and deeper review value.
+          </p>
+
+          <div class="pilot-list">
+            <div class="pilot-item"><span class="check">✓</span><span>Microsoft Word add-in access</span></div>
+            <div class="pilot-item"><span class="check">✓</span><span>Context-aware clause triage</span></div>
+            <div class="pilot-item"><span class="check">✓</span><span>Human-validated deeper review</span></div>
+            <div class="pilot-item"><span class="check">✓</span><span>NDA before live contract use</span></div>
+            <div class="pilot-item"><span class="check">✓</span><span>End-of-pilot feedback report</span></div>
+          </div>
+        </div>
+
+        <form class="pilot-form" id="pilotForm">
+          <h3>Request pilot access</h3>
+          <p>Share a few details and we’ll prepare a pilot conversation.</p>
+
+          <div class="form-group">
+            <label for="name">Full name</label>
+            <input id="name" name="name" type="text" required placeholder="Your name" />
+          </div>
+
+          <div class="form-group">
+            <label for="email">Work email</label>
+            <input id="email" name="email" type="email" required placeholder="you@firm.com" />
+          </div>
+
+          <div class="form-group">
+            <label for="role">Role</label>
+            <select id="role" name="role" required>
+              <option value="">Select role</option>
+              <option>In-house counsel</option>
+              <option>Law firm partner</option>
+              <option>Legal associate</option>
+              <option>Legal operations</option>
+              <option>Contract manager</option>
+              <option>Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="message">What contracts do you review?</label>
+            <textarea id="message" name="message" placeholder="NDAs, MSAs, SaaS agreements, vendor contracts..."></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width:100%;">Submit Pilot Request</button>
+
+          <p class="form-note">
+            This form opens an email draft. Replace the email in the script with your preferred inbox.
+          </p>
+        </form>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section" id="faq">
+      <div class="container faq">
+        <div class="eyebrow">FAQ</div>
+        <h2 class="section-title">Questions legal teams usually ask first.</h2>
+
+        <div class="faq-item open">
+          <button class="faq-question" type="button">
+            Does Context IQ work inside Microsoft Word?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            Yes. Context IQ is designed as a Microsoft Word add-in so lawyers can review contracts
+            without leaving the workflow they already use.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" type="button">
+            Does Context IQ replace lawyers?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            No. Context IQ supports first-pass review by identifying, prioritizing, and explaining risks.
+            Lawyers remain responsible for final legal judgment.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" type="button">
+            Is it fully automated?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            Not at this stage. The product demonstrates automated triage, while deeper review during
+            pilot is human-validated to support trust and accuracy.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-question" type="button">
+            What happens when I request deeper review?
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            During pilot, the user sends deal context and a contract excerpt for a human-validated
+            negotiation brief with key risks, pushback points, and suggested fallback language.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+      <div class="container">
+        <h2>Review contracts with context, not guesswork.</h2>
+        <p>
+          Start with a focused pilot and see whether Context IQ can reduce first-pass review time
+          for your legal team.
+        </p>
+        <a href="#pilot" class="btn btn-secondary">Request Pilot</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-row">
+      <div>© <span id="year"></span> Context IQ. All rights reserved.</div>
+      <div>Assistive contract review support. Not a replacement for legal judgment.</div>
+    </div>
+  </footer>
+
+  <script>
+    // Change this to the email address where you want pilot requests sent.
+    const PILOT_EMAIL = "YOUR_EMAIL@example.com";
+
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    // FAQ accordion
+    const faqItems = document.querySelectorAll(".faq-item");
+
+    faqItems.forEach((item) => {
+      const button = item.querySelector(".faq-question");
+
+      button.addEventListener("click", () => {
+        item.classList.toggle("open");
+      });
     });
 
-    const note = document.createElement("p");
-    note.className = "small-note danger";
-    note.textContent = "This is triage, not final legal approval.";
-    container.appendChild(note);
-  }
+    // Pilot form mailto handler
+    const pilotForm = document.getElementById("pilotForm");
 
-  function renderMessage(msg) {
-    const container = document.getElementById("issues");
-    container.innerHTML = `<p class="small-note">${escapeHtml(msg)}</p>`;
-  }
+    pilotForm.addEventListener("submit", function (event) {
+      event.preventDefault();
 
-  function escapeHtml(str) {
-    return String(str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const role = document.getElementById("role").value;
+      const message = document.getElementById("message").value.trim();
 
-  async function analyzeContract() {
-    const ctxData = getContextInputs();
-    renderMessage("Scanning document...");
+      const subject = encodeURIComponent("Context IQ Pilot Request");
 
-    await Word.run(async context => {
-      const body = context.document.body;
-      const clauseDefs = getClauseDefinitions();
+      const body = encodeURIComponent(
+        `New Context IQ pilot request:\n\n` +
+        `Name: ${name}\n` +
+        `Email: ${email}\n` +
+        `Role: ${role}\n\n` +
+        `Contracts reviewed:\n${message}\n\n` +
+        `Requested from landing page.`
+      );
 
-      // Search ranges for each clause type
-      const searchWork = clauseDefs.map(def => {
-        const results = body.search(def.searchTerm, {
-          matchCase: false,
-          matchWholeWord: false,
-          matchWildcards: false,
-          matchPrefix: false,
-          matchSuffix: false,
-          ignoreSpace: true,
-          ignorePunct: true
-        });
-        results.load("items");
-        return { def, results };
-      });
-
-      await context.sync();
-
-      let issues = [];
-
-      searchWork.forEach(item => {
-        const hits = item.results.items;
-        if (hits.length === 0) {
-          return;
-        }
-
-        const riskLevel = computeRiskLevel(item.def.key, ctxData);
-        const color = colorForRisk(riskLevel);
-
-        hits.forEach(r => {
-          r.font.highlightColor = color;
-        });
-
-        const explanation = buildExplanation(item.def, riskLevel, ctxData);
-
-        issues.push({
-          clauseName: item.def.name,
-          level: riskLevel,
-          explanation
-        });
-      });
-
-      await context.sync();
-
-      lastIssues = issues;
-      renderIssues(issues);
-    })
-    .catch(function (error) {
-      renderMessage("Error while analyzing: " + error);
-      console.error(error);
+      window.location.href = `mailto:${PILOT_EMAIL}?subject=${subject}&body=${body}`;
     });
-  }
-
-  async function clearHighlights() {
-    renderMessage("Clearing highlights...");
-
-    await Word.run(async context => {
-      const body = context.document.body;
-      const clauseDefs = getClauseDefinitions();
-
-      const searchWork = clauseDefs.map(def => {
-        const results = body.search(def.searchTerm, {
-          matchCase: false,
-          matchWholeWord: false,
-          matchWildcards: false,
-          matchPrefix: false,
-          matchSuffix: false,
-          ignoreSpace: true,
-          ignorePunct: true
-        });
-        results.load("items");
-        return { def, results };
-      });
-
-      await context.sync();
-
-      searchWork.forEach(item => {
-        item.results.items.forEach(r => {
-          r.font.highlightColor = null;
-        });
-      });
-
-      await context.sync();
-    })
-    .catch(function (error) {
-      renderMessage("Error clearing highlights: " + error);
-      console.error(error);
-    });
-
-    lastIssues = [];
-    renderIssues([]);
-  }
-
-  // Wizard-of-Oz handoff:
-  // Collects context + current doc text and opens a pre-filled email to you.
-  async function requestDeeperReview() {
-    const ctxData = getContextInputs();
-
-    await Word.run(async context => {
-      const body = context.document.body;
-      body.load("text");
-      await context.sync();
-
-      // Grab the first ~2000 chars to keep mailto length workable
-      const contractText = body.text.substring(0, 2000);
-
-      const subject = encodeURIComponent("Context IQ - Deep Review Request");
-      const emailBody = [
-        "Context (from task pane):",
-        JSON.stringify(ctxData, null, 2),
-        "",
-        "Contract excerpt:",
-        contractText
-      ].join("\n\n");
-
-      const mailtoHref =
-        "mailto:olamideolu11@gmail.com" +
-        "?subject=" + subject +
-        "&body=" + encodeURIComponent(emailBody);
-
-      // This opens user's default mail client with a draft email to you.
-      window.location.href = mailtoHref;
-    })
-    .catch(function (error) {
-      renderMessage("Couldn't prepare deeper review email: " + error);
-      console.error(error);
-    });
-  }
-
-})();
-</script>
+  </script>
 </body>
 </html>
